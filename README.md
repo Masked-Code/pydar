@@ -8,7 +8,10 @@ A high-fidelity radar simulator written in Python, focusing on accurate physics 
 - **Multiple Radar Types**: Pulse, FMCW (Frequency Modulated Continuous Wave), and phased array support
 - **Target Modeling**: Point targets, extended targets, and clutter simulation
 - **Signal Processing**: Range-Doppler processing, CFAR detection, and tracking algorithms
-- **Visualization**: Real-time displays including PPI (Plan Position Indicator) and A-scope
+- **Live 3D Visualization**: Real-time 3D radar simulation with continuous scanning
+- **Interactive Displays**: 3D scatter plots, PPI displays, range-height plots, and track visualization
+- **Real-time Simulation**: Multi-threaded architecture for smooth live updates
+- **Target Tracking**: Automatic target detection and tracking with visualization
 - **Extensible Architecture**: Plugin system for custom waveforms and processing algorithms
 
 ## Installation
@@ -34,9 +37,10 @@ pip install -r requirements.txt
 
 ## Quick Start
 
+### Basic Simulation
+
 ```python
-from pydar import RadarSystem, Target, Environment
-from pydar.waveforms import LinearFMChirp
+from pydar import RadarSystem, Target, Environment, LinearFMChirp
 
 # Create a radar system
 radar = RadarSystem(
@@ -57,12 +61,65 @@ env.add_target(Target(range=5000, velocity=50, rcs=10))
 
 # Run simulation
 results = radar.scan(env, waveform)
+```
 
-# Process and display results
-from pydar.processing import RangeDopplerProcessor
-processor = RangeDopplerProcessor()
-processed = processor.process(results)
-processed.plot()
+### Live 3D Simulation
+
+```python
+from pydar import LiveRadarSimulation, Radar3DVisualizer
+from pydar import SimulationConfig, VisualizationConfig
+
+# Configure live simulation
+sim_config = SimulationConfig(
+    update_rate=30.0,  # 30 FPS
+    scan_rate=2.0,     # 2 scans/second
+    max_range=30000    # 30 km max range
+)
+
+# Create live simulation
+simulation = LiveRadarSimulation(radar, env, waveform, sim_config)
+
+# Create 3D visualizer
+visualizer = Radar3DVisualizer()
+
+# Start live simulation
+simulation.start()
+visualizer.start()
+
+# Update visualization in real-time
+while simulation.is_running:
+    visualizer.update_from_simulation(simulation)
+    time.sleep(0.1)
+```
+
+### Enhanced Wave Propagation Visualization
+
+```python
+from pydar import Enhanced3DRadarVisualizer, EnhancedVisualizationConfig
+
+# Configure enhanced visualization
+config = EnhancedVisualizationConfig(
+    wave_speed_factor=5000,  # Speed up waves for visibility
+    show_power_decay=True,   # Show signal attenuation
+    frame_rate=60.0         # 60 FPS smooth animation
+)
+
+# Create enhanced visualizer
+visualizer = Enhanced3DRadarVisualizer(config)
+
+# Add targets to scene
+visualizer.add_target(
+    target_id="aircraft",
+    position=(10000, 5000, 3000),  # x, y, z in meters
+    velocity=(150, 0, 0),           # velocity vector
+    rcs=50.0                        # radar cross section
+)
+
+# Start animated visualization
+visualizer.start()
+
+# Emit radar pulses
+visualizer.emit_pulse(azimuth=30, elevation=10)
 ```
 
 ## Documentation

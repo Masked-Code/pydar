@@ -39,6 +39,11 @@ class ScanResult:
         self.sample_rate = waveform.sample_rate
         self.duration = waveform.duration
         
+        # Scan metadata for live simulation
+        self.azimuth = 0.0  # Antenna azimuth angle during scan
+        self.elevation = 0.0  # Antenna elevation angle during scan
+        self.scan_time = 0.0  # Simulation time when scan was performed
+        
         # Computed results cache
         self._matched_filter_output = None
         self._range_profile = None

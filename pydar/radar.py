@@ -66,6 +66,10 @@ class RadarSystem:
     antenna: Optional[Antenna] = None
     temperature: float = 290.0  # System temperature in Kelvin
     
+    # Antenna pointing angles
+    antenna_azimuth: float = 0.0  # Antenna azimuth angle in degrees
+    antenna_elevation: float = 0.0  # Antenna elevation angle in degrees
+    
     # Derived parameters
     wavelength: float = field(init=False)
     noise_power: float = field(init=False)
@@ -227,6 +231,29 @@ class RadarSystem:
         
         # Get all targets from environment
         targets = environment.get_all_targets()
+        
+        # Filter targets based on antenna pointing if specified
+        if hasattr(self, 'antenna_azimuth') and hasattr(self, 'antenna_elevation'):
+            # Simple beamwidth filtering (assumes 3dB beamwidth)
+            beam_azimuth = self.antenna_azimuth
+            beam_elevation = self.antenna_elevation
+            beamwidth_az = self.antenna.beamwidth_azimuth
+            beamwidth_el = self.antenna.beamwidth_elevation
+            
+            filtered_targets = []
+            for target in targets:
+                # Check if target is within beam
+                az_diff = abs(target.azimuth - beam_azimuth)
+                el_diff = abs(target.elevation - beam_elevation)
+                
+                # Handle azimuth wrap-around
+                if az_diff > 180:
+                    az_diff = 360 - az_diff
+                
+                if az_diff <= beamwidth_az/2 and el_diff <= beamwidth_el/2:
+                    filtered_targets.append(target)
+            
+            targets = filtered_targets
         
         # Process each target
         target_info = []
