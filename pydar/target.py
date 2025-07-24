@@ -7,18 +7,8 @@ characteristics including RCS, motion, and fluctuation models.
 
 from dataclasses import dataclass, field
 from typing import List, Optional, Tuple, Union
-from enum import Enum
 import numpy as np
 from scipy import stats
-
-
-class SwerlingModel(Enum):
-    """Swerling target fluctuation models."""
-    SWERLING_0 = 0  # Non-fluctuating
-    SWERLING_1 = 1  # Scan-to-scan fluctuation, chi-squared with 2 DOF
-    SWERLING_2 = 2  # Pulse-to-pulse fluctuation, chi-squared with 2 DOF
-    SWERLING_3 = 3  # Scan-to-scan fluctuation, chi-squared with 4 DOF
-    SWERLING_4 = 4  # Pulse-to-pulse fluctuation, chi-squared with 4 DOF
 
 
 @dataclass
@@ -31,7 +21,6 @@ class Target:
     azimuth: float = 0.0  # Azimuth angle in degrees
     elevation: float = 0.0  # Elevation angle in degrees
     acceleration: float = 0.0  # Radial acceleration in m/s^2
-    swerling_model: SwerlingModel = SwerlingModel.SWERLING_0
     phase_noise_std: float = 0.0  # Phase noise standard deviation in radians
     
     # Internal state
@@ -60,30 +49,6 @@ class Target:
         self._time = time
         self.range = self._initial_range + self._initial_velocity * time + 0.5 * self.acceleration * time**2
         self.velocity = self._initial_velocity + self.acceleration * time
-    
-    def get_rcs_sample(self, num_samples: int = 1) -> Union[float, np.ndarray]:
-        """
-        Get RCS samples based on Swerling model.
-        
-        Args:
-            num_samples: Number of samples to generate
-            
-        Returns:
-            RCS sample(s) in square meters
-        """
-        if self.swerling_model == SwerlingModel.SWERLING_0:
-            # Non-fluctuating
-            return self.rcs if num_samples == 1 else np.full(num_samples, self.rcs)
-        
-        elif self.swerling_model in [SwerlingModel.SWERLING_1, SwerlingModel.SWERLING_2]:
-            # Chi-squared with 2 DOF (exponential distribution)
-            samples = np.random.exponential(scale=self.rcs, size=num_samples)
-            
-        else:  # SWERLING_3 or SWERLING_4
-            # Chi-squared with 4 DOF
-            samples = np.random.gamma(shape=2, scale=self.rcs/2, size=num_samples)
-        
-        return samples[0] if num_samples == 1 else samples
     
     def to_cartesian(self) -> Tuple[float, float, float]:
         """
@@ -116,56 +81,6 @@ class Target:
         """String representation of target."""
         return (f"Target(range={self.range:.1f}m, velocity={self.velocity:.1f}m/s, "
                 f"rcs={self.rcs:.1f}m², az={self.azimuth:.1f}°, el={self.elevation:.1f}°)")
-
-
-@dataclass
-class ExtendedTarget(Target):
-    """Extended target with spatial extent."""
-    
-    extent_range: float = 10.0  # Extent in range dimension (meters)
-    extent_cross_range: float = 5.0  # Extent in cross-range dimension (meters)
-    num_scatterers: int = 10  # Number of point scatterers
-    
-    def get_scatterers(self) -> List[Target]:
-        """
-        Generate point scatterers for extended target.
-        
-        Returns:
-            List of Target objects representing individual scatterers
-        """
-        scatterers = []
-        
-        # Generate random positions within target extent
-        range_offsets = np.random.uniform(-self.extent_range/2, self.extent_range/2, 
-                                          self.num_scatterers)
-        cross_range_offsets = np.random.uniform(-self.extent_cross_range/2, 
-                                                self.extent_cross_range/2, 
-                                                self.num_scatterers)
-        
-        # RCS distribution among scatterers
-        rcs_values = np.random.exponential(scale=self.rcs/self.num_scatterers, 
-                                           size=self.num_scatterers)
-        
-        for i in range(self.num_scatterers):
-            # Calculate scatterer position
-            scatterer_range = self.range + range_offsets[i]
-            
-            # Cross-range offset affects azimuth
-            az_offset = np.degrees(cross_range_offsets[i] / self.range)
-            scatterer_az = self.azimuth + az_offset
-            
-            scatterer = Target(
-                range=scatterer_range,
-                velocity=self.velocity,
-                rcs=rcs_values[i],
-                azimuth=scatterer_az,
-                elevation=self.elevation,
-                acceleration=self.acceleration,
-                swerling_model=self.swerling_model
-            )
-            scatterers.append(scatterer)
-        
-        return scatterers
 
 
 class TargetCollection:
@@ -262,8 +177,7 @@ def generate_random_targets(num_targets: int,
             velocity=np.random.uniform(*velocity_bounds),
             rcs=np.random.uniform(*rcs_bounds),
             azimuth=np.random.uniform(*azimuth_bounds),
-            elevation=np.random.uniform(*elevation_bounds),
-            swerling_model=np.random.choice(list(SwerlingModel))
+            elevation=np.random.uniform(*elevation_bounds)
         )
         collection.add_target(target)
     

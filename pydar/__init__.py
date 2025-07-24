@@ -9,15 +9,10 @@ __author__ = "PyDar Development Team"
 
 # Import main classes for easier access
 from .radar import RadarSystem, Antenna
-from .target import Target, TargetCollection, ExtendedTarget, SwerlingModel
-from .environment import Environment, Atmosphere, SeaClutter, LandClutter
-from .waveforms import (
-    LinearFMChirp, PulseTrain, Waveform, BarkerCode,
-    SteppedFrequency, CustomWaveform
-)
-from .scan_result import ScanResult
-from .live_simulation import LiveRadarSimulation, SimulationConfig
-from .visualization import Radar3DVisualizer, DashRadarVisualizer, VisualizationConfig, create_animated_visualization
+from .target import Target, TargetCollection
+from .environment import Environment, Atmosphere
+from .waveforms import LinearFMChirp
+from .visualization import Radar3DVisualizer, DashRadarVisualizer, VisualizationConfig
 
 __all__ = [
     # Core radar classes
@@ -27,33 +22,16 @@ __all__ = [
     # Target classes
     "Target",
     "TargetCollection",
-    "ExtendedTarget",
-    "SwerlingModel",
     
     # Environment classes
     "Environment",
     "Atmosphere",
-    "SeaClutter",
-    "LandClutter",
     
     # Waveform classes
     "LinearFMChirp",
-    "PulseTrain",
-    "Waveform",
-    "BarkerCode",
-    "SteppedFrequency",
-    "CustomWaveform",
-    
-    # Results and analysis
-    "ScanResult",
-    
-    # Live simulation
-    "LiveRadarSimulation",
-    "SimulationConfig",
     
     # Visualization
     "Radar3DVisualizer",
     "DashRadarVisualizer",
     "VisualizationConfig",
-    "create_animated_visualization",
 ]

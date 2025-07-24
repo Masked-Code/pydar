@@ -1,28 +1,16 @@
 """
-Static Radar Simulation Example
+Enhanced 3D radar visualization example.
 
-This example demonstrates:
-- Single and multi-frame radar simulations
-- Signal processing and analysis
-- Detection algorithms
-- Performance metrics
-- Static 3D visualization
+This example shows:
+- 3D visualization of radar system and targets
+- Multiple target types at different positions
+- Radar beam visualization
+- Detection results
 """
 
 import numpy as np
-import matplotlib.pyplot as plt
-from typing import List, Dict
-
-# Import pydar components
-from pydar import (
-    RadarSystem, Antenna, LinearFMChirp,
-    Target, TargetCollection,
-    Environment, Atmosphere,
-    Radar3DVisualizer, VisualizationConfig
-)
-from pydar.processing import CFARDetector, RangeDopplerProcessor
-import numpy as np
-import scipy.constants as const
+from pydar.visualization import Radar3DVisualizer, VisualizationConfig
+from pydar import RadarSystem, Target, Environment, LinearFMChirp, Antenna, TargetCollection
 
 
 def create_target_from_position(position, velocity, rcs, target_id):
@@ -54,313 +42,171 @@ def create_target_from_position(position, velocity, rcs, target_id):
     return target
 
 
-def create_simple_scenario():
-    """Create a simple radar scenario for analysis."""
-    # Create antenna
+def main():
+    """Run enhanced 3D visualization."""
+    
+    print("=== Enhanced 3D Radar Visualization ===")
+    print("This visualization shows:")
+    print("- 3D view of radar and targets")
+    print("- Radar beam visualization")
+    print("- Different target types and positions")
+    print()
+    
+    # Configure visualization
+    config = VisualizationConfig(
+        figure_width=1600,
+        figure_height=900,
+        max_range=30000,  # 30 km
+        show_statistics=True,
+        show_rcs=True,
+        show_doppler=True
+    )
+    
+    # Create radar system
+    print("Creating radar system...")
     antenna = Antenna(
+        gain=35,
         beamwidth_azimuth=2.0,
         beamwidth_elevation=2.0,
-        gain=35.0,
-        sidelobe_level=-25.0
+        sidelobe_level=-25
     )
     
-    # Create waveform
     waveform = LinearFMChirp(
-        duration=10e-6,  # 10 microseconds
-        sample_rate=1e9,  # 1 GHz sample rate
-        bandwidth=100e6,  # 100 MHz
-        center_frequency=10e9  # X-band
+        duration=10e-6,
+        sample_rate=1e9,
+        bandwidth=100e6,
+        center_frequency=10e9
     )
     
-    # Create radar
     radar = RadarSystem(
         antenna=antenna,
         waveform=waveform,
-        position=(0, 0, 0),
+        position=(0, 0, 100),  # 100m elevation
         velocity=(0, 0, 0),
-        transmit_power=5000,  # 5 kW
+        transmit_power=5000,
         noise_figure=3.0,
         losses=4.0
     )
     
-    # Create targets
+    # Create environment with targets
+    print("Creating environment with targets...")
+    environment = Environment()
     targets = TargetCollection()
     
-    # Target 1: Approaching aircraft
+    # Aircraft at high altitude
     targets.add_target(create_target_from_position(
-        position=[10000, 5000, 3000],
-        velocity=[-200, -100, 0],  # Approaching at ~224 m/s
+        position=(15000, 10000, 5000),
+        velocity=(-150, -50, 0),  # Moving southwest
+        rcs=50.0,
+        target_id="AC1"
+    ))
+    
+    # Helicopter hovering
+    targets.add_target(create_target_from_position(
+        position=(5000, -3000, 1000),
+        velocity=(20, 10, 0),  # Slow movement
+        rcs=20.0,
+        target_id="HEL1"
+    ))
+    
+    # Drone swarm
+    for i in range(3):
+        angle = i * 120  # Spread around
+        dist = 8000
+        targets.add_target(create_target_from_position(
+            position=(
+                dist * np.cos(np.radians(angle)),
+                dist * np.sin(np.radians(angle)),
+                500 + i * 200
+            ),
+            velocity=(
+                -20 * np.sin(np.radians(angle)),
+                20 * np.cos(np.radians(angle)),
+                0
+            ),
+            rcs=0.5,
+            target_id=f"UAV{i}"
+        ))
+    
+    # Ground vehicle
+    targets.add_target(create_target_from_position(
+        position=(3000, 2000, 0),
+        velocity=(15, -10, 0),
         rcs=10.0,
-        target_id="AIRCRAFT_1"
+        target_id="GV1"
     ))
     
-    # Target 2: Crossing target
+    # Stationary tower
     targets.add_target(create_target_from_position(
-        position=[-8000, 12000, 5000],
-        velocity=[150, 0, 0],  # Crossing at 150 m/s
-        rcs=5.0,
-        target_id="AIRCRAFT_2"
+        position=(-5000, 5000, 200),
+        velocity=(0, 0, 0),
+        rcs=100.0,
+        target_id="TOWER"
     ))
     
-    # Target 3: Small drone
-    targets.add_target(create_target_from_position(
-        position=[3000, 2000, 500],
-        velocity=[20, 10, 5],
-        rcs=0.01,  # Very small RCS
-        target_id="DRONE_1"
-    ))
-    
-    # Create environment
-    environment = Environment()
     environment.targets = targets
     
-    return radar, environment
-
-
-def perform_single_scan(radar: RadarSystem, environment: Environment, 
-                       azimuth: float, elevation: float) -> Dict:
-    """Perform a single radar scan and analyze results."""
-    print(f"\nScanning at Az: {azimuth:.1f}°, El: {elevation:.1f}°")
-    
-    # Point antenna
-    radar.antenna_azimuth = azimuth
-    radar.antenna_elevation = elevation
-    
-    # Perform scan
+    # Perform a scan
+    print("\nPerforming radar scan...")
+    radar.antenna_azimuth = 0
+    radar.antenna_elevation = 10
     scan_result = radar.scan(environment)
     
-    # Process returns
-    detections = []
-    if scan_result.returns:
-        print(f"  Found {len(scan_result.returns)} returns")
-        
-        for ret in scan_result.returns:
-            # Calculate SNR
-            snr = calculate_snr(
-                ret.power,
-                radar.noise_power,
-                radar.waveform.bandwidth
-            )
-            
-            # Detection threshold (simple threshold detector)
-            if snr > 13.0:  # ~13 dB for Pd=0.9, Pfa=1e-6
-                detection = {
-                    'range': ret.range,
-                    'azimuth': ret.azimuth,
-                    'elevation': ret.elevation,
-                    'doppler': ret.doppler_shift,
-                    'snr': snr,
-                    'target_id': ret.target_id
-                }
-                detections.append(detection)
-                print(f"    Detection: {ret.target_id} at {ret.range:.0f}m, SNR: {snr:.1f} dB")
+    print(f"Detected {len(scan_result.returns)} targets")
     
-    return {
-        'azimuth': azimuth,
-        'elevation': elevation,
-        'detections': detections,
-        'scan_result': scan_result
-    }
-
-
-def perform_volume_scan(radar: RadarSystem, environment: Environment) -> List[Dict]:
-    """Perform a volume scan over a sector."""
-    results = []
-    
-    # Define scan volume
-    az_start, az_end, az_step = -45, 45, 5
-    el_start, el_end, el_step = 0, 30, 5
-    
-    print(f"\nPerforming volume scan:")
-    print(f"  Azimuth: {az_start}° to {az_end}° in {az_step}° steps")
-    print(f"  Elevation: {el_start}° to {el_end}° in {el_step}° steps")
-    
-    # Scan pattern
-    for el in np.arange(el_start, el_end + el_step, el_step):
-        for az in np.arange(az_start, az_end + az_step, az_step):
-            result = perform_single_scan(radar, environment, az, el)
-            results.append(result)
-    
-    # Summary
-    total_detections = sum(len(r['detections']) for r in results)
-    print(f"\nVolume scan complete: {total_detections} total detections")
-    
-    return results
-
-
-def analyze_range_doppler(radar: RadarSystem, environment: Environment, 
-                         azimuth: float, elevation: float):
-    """Perform range-Doppler analysis."""
-    print(f"\nRange-Doppler Analysis at Az: {azimuth:.1f}°, El: {elevation:.1f}°")
-    
-    # Point antenna
-    radar.antenna_azimuth = azimuth
-    radar.antenna_elevation = elevation
-    
-    # Get returns
-    scan_result = radar.scan(environment)
-    
-    if not scan_result.returns:
-        print("  No returns detected")
-        return
-    
-    # Create range-Doppler processor
-    processor = RangeDopplerProcessor(
-        waveform=radar.waveform,
-        num_pulses=128,
-        range_bins=256,
-        doppler_bins=256
-    )
-    
-    # Process returns (simplified)
-    for ret in scan_result.returns:
-        print(f"\n  Target: {ret.target_id}")
-        print(f"    Range: {ret.range:.0f} m")
-        print(f"    Radial velocity: {ret.doppler_shift * 3e8 / (2 * radar.waveform.center_frequency):.1f} m/s")
-        print(f"    Power: {10*np.log10(ret.power):.1f} dBm")
-
-
-def demonstrate_cfar(radar: RadarSystem, environment: Environment):
-    """Demonstrate CFAR detection."""
-    print("\nCFAR Detection Demonstration")
-    
-    # Create CFAR detector (using CA-CFAR)
-    from pydar.processing.cfar import CellAveragingCFAR
-    cfar = CellAveragingCFAR(
-        guard_cells=4,
-        training_cells=16,
-        pfa=1e-6  # Probability of false alarm
-    )
-    
-    # Perform scan
-    scan_result = radar.scan(environment)
-    
-    if scan_result.returns:
-        # Create range profile
-        max_range = 50000
-        range_bins = 1000
-        ranges = np.linspace(0, max_range, range_bins)
-        range_profile = np.zeros(range_bins)
-        
-        # Add returns to range profile
-        for ret in scan_result.returns:
-            idx = int(ret.range / max_range * range_bins)
-            if 0 <= idx < range_bins:
-                range_profile[idx] += ret.power
-        
-        # Add noise
-        noise_power = radar.noise_power
-        range_profile += np.random.rayleigh(np.sqrt(noise_power), range_bins)
-        
-        # Apply CFAR
-        detections = cfar.detect(range_profile)
-        
-        print(f"  CFAR detected {len(detections)} targets")
-        
-        # Plot results
-        plt.figure(figsize=(10, 6))
-        plt.plot(ranges/1000, 10*np.log10(range_profile), 'b-', label='Range Profile')
-        
-        for det_idx in detections:
-            plt.axvline(ranges[det_idx]/1000, color='r', linestyle='--', alpha=0.5)
-        
-        plt.xlabel('Range (km)')
-        plt.ylabel('Power (dB)')
-        plt.title('CFAR Detection Results')
-        plt.grid(True)
-        plt.legend()
-        plt.tight_layout()
-        plt.show()
-
-
-def visualize_scenario(radar: RadarSystem, environment: Environment, 
-                      scan_results: List[Dict]):
-    """Create 3D visualization of the scenario."""
-    # Create visualizer
-    config = VisualizationConfig(
-        figure_width=1000,
-        figure_height=800,
-        show_statistics=True,
-        trail_length=0  # No trails for static view
-    )
+    # Create visualization
+    print("\nCreating 3D visualization...")
     visualizer = Radar3DVisualizer(config)
     
-    # Create figure
+    # Create the figure
     fig = visualizer.create_base_figure()
     
     # Add radar
     visualizer.add_radar(fig, radar)
     
-    # Add targets
-    visualizer.add_targets(fig, environment.targets.targets)
+    # Add radar beam
+    visualizer.add_beam(fig, radar, radar.antenna_azimuth, radar.antenna_elevation)
     
-    # Add all detections
-    all_detections = []
-    for result in scan_results:
-        all_detections.extend(result['detections'])
+    # Add all targets
+    visualizer.add_targets(fig, targets.targets)
     
-    if all_detections:
-        visualizer.add_detections(fig, all_detections)
+    # Add detections
+    if scan_result.returns:
+        detections = []
+        for ret in scan_result.returns:
+            detections.append({
+                'range': ret.range,
+                'azimuth': ret.azimuth,
+                'elevation': ret.elevation,
+                'doppler': ret.doppler_shift,
+                'power': ret.power,
+                'target_id': ret.target_id
+            })
+        visualizer.add_detections(fig, detections)
     
-    # Show
+    # Add statistics
+    if config.show_statistics:
+        stats = {
+            'num_targets': len(targets.targets),
+            'num_detections': len(scan_result.returns),
+            'antenna_az': radar.antenna_azimuth,
+            'antenna_el': radar.antenna_elevation
+        }
+        visualizer.add_statistics_panel(fig, stats)
+    
+    # Show the visualization
+    print("\nDisplaying visualization...")
+    print("You should see:")
+    print("1. Red diamond: Radar position")
+    print("2. Yellow cone: Radar beam")
+    print("3. Blue markers: Target positions")
+    print("4. Green markers: Detected targets")
+    print("5. Statistics panel (if enabled)")
+    
     fig.show()
-
-
-def calculate_snr(power_received, noise_power, bandwidth):
-    """Calculate Signal-to-Noise Ratio."""
-    return 10 * np.log10(power_received / (noise_power * bandwidth))
-
-
-def detection_probability(snr_db, pfa=1e-6):
-    """Calculate the detection probability given SNR and probability of false alarm."""
-    # Placeholder calculation
-    return min(max(snr_db / 20, 0.1), 0.9)
-
-
-def main():
-    """Run static simulation examples."""
-    print("=== Static Radar Simulation ===")
     
-    # Create scenario
-    radar, environment = create_simple_scenario()
-    
-    # Example 1: Single beam position
-    print("\n1. Single Beam Position Analysis")
-    result = perform_single_scan(radar, environment, azimuth=20.0, elevation=10.0)
-    
-    # Example 2: Volume scan
-    print("\n2. Volume Scan")
-    scan_results = perform_volume_scan(radar, environment)
-    
-    # Example 3: Range-Doppler analysis
-    print("\n3. Range-Doppler Analysis")
-    analyze_range_doppler(radar, environment, azimuth=20.0, elevation=10.0)
-    
-    # Example 4: CFAR detection
-    print("\n4. CFAR Detection")
-    radar.antenna_azimuth = 20.0
-    radar.antenna_elevation = 10.0
-    demonstrate_cfar(radar, environment)
-    
-    # Example 5: 3D Visualization
-    print("\n5. 3D Visualization")
-    visualize_scenario(radar, environment, scan_results)
-    
-    # Performance metrics
-    print("\n=== Performance Metrics ===")
-    for target in environment.targets.targets:
-        # Calculate detection probability
-        r = np.linalg.norm(target.position)
-        snr = radar.calculate_snr(r, target.rcs)
-        pd = detection_probability(snr, pfa=1e-6)
-        
-        print(f"\nTarget: {target.target_id}")
-        print(f"  Range: {r:.0f} m")
-        print(f"  RCS: {target.rcs:.2f} m²")
-        print(f"  SNR: {snr:.1f} dB")
-        print(f"  Pd: {pd:.3f}")
-    
-    print("\nSimulation complete!")
+    print("\nVisualization complete!")
+    print("Close the browser tab to exit.")
 
 
 if __name__ == "__main__":
