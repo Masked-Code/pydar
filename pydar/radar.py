@@ -18,6 +18,24 @@ from .utils.conversions import db_to_linear, linear_to_db
 
 
 @dataclass
+class DetectionReturn:
+    """Simple detection return data."""
+    range: float  # Range in meters
+    azimuth: float  # Azimuth in degrees
+    elevation: float  # Elevation in degrees
+    doppler_shift: float  # Doppler shift in Hz
+    power: float  # Received power in Watts
+    target_id: str  # Target identifier
+
+
+class SimpleScanResult:
+    """Simple scan result container."""
+    
+    def __init__(self, returns: List[DetectionReturn]):
+        self.returns = returns
+
+
+@dataclass
 class Antenna:
     """Represents a radar antenna with its characteristics."""
     
@@ -57,13 +75,13 @@ class Antenna:
 class RadarSystem:
     """Main radar system class implementing radar equation and signal processing."""
     
-    frequency: float  # Operating frequency in Hz
-    power: float  # Transmit power in Watts
-    antenna_gain: float  # Antenna gain in dB
-    system_loss: float = 3.0  # System losses in dB
-    noise_figure: float = 3.0  # Receiver noise figure in dB
-    bandwidth: Optional[float] = None  # Receiver bandwidth in Hz
-    antenna: Optional[Antenna] = None
+    antenna: Antenna  # Required antenna object
+    waveform: Waveform  # Required waveform object
+    position: Tuple[float, float, float] = (0.0, 0.0, 0.0)  # Radar position [x, y, z] in meters
+    velocity: Tuple[float, float, float] = (0.0, 0.0, 0.0)  # Radar velocity [vx, vy, vz] in m/s
+    transmit_power: float = 1000.0  # Transmit power in Watts
+    noise_figure: float = 3.0  # Receiver noise figure in dB  
+    losses: float = 3.0  # System losses in dB
     temperature: float = 290.0  # System temperature in Kelvin
     
     # Antenna pointing angles
@@ -76,24 +94,15 @@ class RadarSystem:
     
     def __post_init__(self):
         """Calculate derived parameters."""
-        self.wavelength = c / self.frequency
+        self.wavelength = c / self.waveform.center_frequency
+        self.frequency = self.waveform.center_frequency
+        self.bandwidth = self.waveform.bandwidth
         
-        # If antenna not provided, create default with specified gain
-        if self.antenna is None:
-            # Estimate beamwidth from gain (approximation)
-            beamwidth = 70 / np.sqrt(db_to_linear(self.antenna_gain))
-            self.antenna = Antenna(
-                gain=self.antenna_gain,
-                beamwidth_azimuth=beamwidth,
-                beamwidth_elevation=beamwidth
-            )
+        # Convert position to numpy array
+        self.position = np.array(self.position)
         
-        # Initialize noise_power to avoid AttributeError
-        self.noise_power = 0.0
-        
-        # Calculate noise power if bandwidth is set
-        if self.bandwidth is not None:
-            self._update_noise_power()
+        # Initialize noise_power
+        self._update_noise_power()
     
     def _update_noise_power(self):
         """Calculate receiver noise power."""
@@ -114,13 +123,17 @@ class RadarSystem:
         # Convert gains and losses to linear scale
         gt = db_to_linear(self.antenna.gain)
         gr = gt  # Assume same antenna for Tx and Rx
-        loss = db_to_linear(self.system_loss)
+        loss = db_to_linear(self.losses)
         
         # Radar equation
-        pr = (self.power * gt * gr * self.wavelength**2 * rcs) / \
+        pr = (self.transmit_power * gt * gr * self.wavelength**2 * rcs) / \
              ((4 * np.pi)**3 * target_range**4 * loss)
         
         return pr
+    
+    def calculate_snr(self, target_range: float, rcs: float) -> float:
+        """Calculate SNR for compatibility."""
+        return self.snr(target_range, rcs)
     
     def snr(self, target_range: float, rcs: float) -> float:
         """
@@ -205,116 +218,75 @@ class RadarSystem:
         """
         return prf * self.wavelength / 4
     
-    def scan(self, environment: Environment, waveform: Waveform,
-             scan_angles: Optional[Dict[str, Tuple[float, float]]] = None) -> 'ScanResult':
+    def scan(self, environment: Environment) -> 'SimpleScanResult':
         """
         Perform a radar scan of the environment.
         
         Args:
             environment: Environment containing targets and clutter
-            waveform: Waveform to transmit
-            scan_angles: Optional dict with 'azimuth' and 'elevation' angle ranges
             
         Returns:
-            ScanResult object containing received signals and metadata
+            SimpleScanResult object containing detected targets
         """
-        # Set bandwidth if not already set
-        if self.bandwidth is None:
-            self.bandwidth = waveform.bandwidth
-            self._update_noise_power()
-        
-        # Generate transmit signal
-        tx_signal = waveform.generate()
-        
-        # Initialize received signal
-        rx_signal = np.zeros_like(tx_signal, dtype=complex)
+        from .utils.coordinates import cartesian_to_spherical
         
         # Get all targets from environment
-        targets = environment.get_all_targets()
+        if hasattr(environment, 'targets') and hasattr(environment.targets, 'targets'):
+            targets = environment.targets.targets
+        else:
+            targets = []
         
-        # Filter targets based on antenna pointing if specified
-        if hasattr(self, 'antenna_azimuth') and hasattr(self, 'antenna_elevation'):
-            # Simple beamwidth filtering (assumes 3dB beamwidth)
-            beam_azimuth = self.antenna_azimuth
-            beam_elevation = self.antenna_elevation
-            beamwidth_az = self.antenna.beamwidth_azimuth
-            beamwidth_el = self.antenna.beamwidth_elevation
-            
-            filtered_targets = []
-            for target in targets:
-                # Check if target is within beam
-                az_diff = abs(target.azimuth - beam_azimuth)
-                el_diff = abs(target.elevation - beam_elevation)
-                
-                # Handle azimuth wrap-around
-                if az_diff > 180:
-                    az_diff = 360 - az_diff
-                
-                if az_diff <= beamwidth_az/2 and el_diff <= beamwidth_el/2:
-                    filtered_targets.append(target)
-            
-            targets = filtered_targets
+        # Create detection returns
+        returns = []
         
-        # Process each target
-        target_info = []
         for target in targets:
-            # Calculate round-trip time
-            round_trip_time = 2 * target.range / c
+            # Get target position in cartesian coordinates
+            if hasattr(target, 'position'):
+                target_pos = np.array(target.position)
+            else:
+                # Convert from spherical to cartesian
+                target_pos = np.array(target.to_cartesian())
             
-            # Calculate Doppler shift
-            doppler_shift = 2 * target.velocity * self.frequency / c
+            # Calculate target position relative to radar
+            rel_pos = target_pos - self.position
             
-            # Calculate received power
-            pr = self.radar_equation(target.range, target.rcs)
+            # Convert to spherical coordinates
+            r, az, el = cartesian_to_spherical(rel_pos[0], rel_pos[1], rel_pos[2])
             
-            # Generate target return
-            # Account for propagation delay and Doppler
-            t = waveform.time_vector
-            delayed_signal = waveform.generate(t - round_trip_time)
+            # Check if target is within beam
+            az_deg = np.degrees(az)
+            el_deg = np.degrees(el)
             
-            # Apply Doppler shift
-            doppler_signal = delayed_signal * np.exp(1j * 2 * np.pi * doppler_shift * t)
+            az_diff = abs(az_deg - self.antenna_azimuth)
+            el_diff = abs(el_deg - self.antenna_elevation)
             
-            # Apply received power scaling
-            amplitude = np.sqrt(pr)
-            target_return = amplitude * doppler_signal
+            # Handle azimuth wrap-around
+            if az_diff > 180:
+                az_diff = 360 - az_diff
             
-            # Add phase noise if specified
-            if hasattr(target, 'phase_noise_std') and target.phase_noise_std > 0:
-                phase_noise = np.random.normal(0, target.phase_noise_std, size=len(target_return))
-                target_return *= np.exp(1j * phase_noise)
-            
-            # Add to received signal
-            rx_signal += target_return
-            
-            # Store target info for analysis
-            target_info.append({
-                'target': target,
-                'round_trip_time': round_trip_time,
-                'doppler_shift': doppler_shift,
-                'received_power': pr,
-                'snr': linear_to_db(pr / self.noise_power)
-            })
+            # Check if within beamwidth
+            if az_diff <= self.antenna.beamwidth_azimuth/2 and el_diff <= self.antenna.beamwidth_elevation/2:
+                # Calculate received power
+                pr = self.radar_equation(r, target.rcs)
+                
+                # Calculate doppler shift from radial velocity
+                # target.velocity is already the radial velocity
+                radial_velocity = target.velocity
+                doppler_shift = 2 * radial_velocity * self.frequency / c
+                
+                # Create detection return
+                detection = DetectionReturn(
+                    range=r,
+                    azimuth=az_deg,
+                    elevation=el_deg,
+                    doppler_shift=doppler_shift,
+                    power=pr,
+                    target_id=target.target_id if hasattr(target, 'target_id') else f"T{id(target)}"
+                )
+                returns.append(detection)
         
-        # Add thermal noise
-        noise = np.sqrt(self.noise_power / 2) * (
-            np.random.normal(size=len(rx_signal)) + 
-            1j * np.random.normal(size=len(rx_signal))
-        )
-        rx_signal += noise
-        
-        # Create scan result
-        from .scan_result import ScanResult
-        result = ScanResult(
-            tx_signal=tx_signal,
-            rx_signal=rx_signal,
-            waveform=waveform,
-            radar_system=self,
-            environment=environment,
-            target_info=target_info,
-            noise_power=self.noise_power
-        )
-        
+        # Create simple scan result
+        result = SimpleScanResult(returns=returns)
         return result
 
 

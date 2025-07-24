@@ -1,18 +1,22 @@
 # PyDar - Python Radar Simulator
 
-A high-fidelity radar simulator written in Python, focusing on accurate physics modeling and educational visualization.
+A high-fidelity radar simulation library for Python, designed for educational and research purposes. PyDar provides comprehensive radar system modeling, signal processing, and visualization capabilities.
 
 ## Features
 
-- **Accurate Physics Modeling**: Implements fundamental radar equations and signal processing
-- **Multiple Radar Types**: Pulse, FMCW (Frequency Modulated Continuous Wave), and phased array support
-- **Target Modeling**: Point targets, extended targets, and clutter simulation
-- **Signal Processing**: Range-Doppler processing, CFAR detection, and tracking algorithms
-- **Live 3D Visualization**: Real-time 3D radar simulation with continuous scanning
-- **Interactive Displays**: 3D scatter plots, PPI displays, range-height plots, and track visualization
-- **Real-time Simulation**: Multi-threaded architecture for smooth live updates
-- **Target Tracking**: Automatic target detection and tracking with visualization
-- **Extensible Architecture**: Plugin system for custom waveforms and processing algorithms
+### Core Capabilities
+- **Radar System Modeling**: Complete radar system simulation including antenna patterns, waveforms, and signal processing
+- **Target Modeling**: Various target types with RCS models, motion dynamics, and Swerling fluctuation models
+- **Environment Simulation**: Atmospheric effects, clutter modeling, and propagation effects
+- **Signal Processing**: CFAR detection, range-Doppler processing, and multi-target tracking algorithms
+- **Visualization**: Real-time 3D visualization using Plotly and Dash with web-based interface
+
+### Key Components
+- Phased array and parabolic antenna models with realistic beam patterns
+- Multiple waveform types (Linear FM chirp, pulse trains, Barker codes, stepped frequency)
+- Advanced detection algorithms (CA-CFAR, OS-CFAR, GO-CFAR)
+- Multi-target tracking with Kalman filtering
+- Live web-based visualization with automatic browser launch
 
 ## Installation
 
@@ -37,89 +41,57 @@ pip install -r requirements.txt
 
 ## Quick Start
 
-### Basic Simulation
+### Static Simulation Example
 
 ```python
-from pydar import RadarSystem, Target, Environment, LinearFMChirp
+from pydar import RadarSystem, Antenna, LinearFMChirp, Target, Environment
+from pydar import Radar3DVisualizer
 
-# Create a radar system
-radar = RadarSystem(
-    frequency=10e9,  # 10 GHz
-    power=1000,      # 1 kW
-    antenna_gain=30  # 30 dB
-)
+# Create radar system
+antenna = Antenna(beamwidth_azimuth=3.0, beamwidth_elevation=3.0, gain=30.0)
+waveform = LinearFMChirp(center_frequency=10e9, bandwidth=50e6, pulse_width=10e-6)
+radar = RadarSystem(antenna=antenna, waveform=waveform, transmit_power=1000)
 
-# Define a waveform
-waveform = LinearFMChirp(
-    bandwidth=50e6,  # 50 MHz
-    duration=10e-6   # 10 microseconds
-)
+# Create target
+target = Target(position=[10000, 5000, 3000], velocity=[-100, 0, 0], rcs=10.0)
 
-# Create environment with a target
-env = Environment()
-env.add_target(Target(range=5000, velocity=50, rcs=10))
+# Create environment and simulate
+environment = Environment()
+environment.add_target(target)
 
-# Run simulation
-results = radar.scan(env, waveform)
-```
+# Perform scan
+scan_result = radar.scan(environment)
 
-### Live 3D Simulation
-
-```python
-from pydar import LiveRadarSimulation, Radar3DVisualizer
-from pydar import SimulationConfig, VisualizationConfig
-
-# Configure live simulation
-sim_config = SimulationConfig(
-    update_rate=30.0,  # 30 FPS
-    scan_rate=2.0,     # 2 scans/second
-    max_range=30000    # 30 km max range
-)
-
-# Create live simulation
-simulation = LiveRadarSimulation(radar, env, waveform, sim_config)
-
-# Create 3D visualizer
+# Visualize
 visualizer = Radar3DVisualizer()
-
-# Start live simulation
-simulation.start()
-visualizer.start()
-
-# Update visualization in real-time
-while simulation.is_running:
-    visualizer.update_from_simulation(simulation)
-    time.sleep(0.1)
+fig = visualizer.visualize(radar, environment, scan_result=scan_result)
+fig.show()
 ```
 
-### Enhanced Wave Propagation Visualization
+### Live Simulation Example
 
 ```python
-from pydar import Enhanced3DRadarVisualizer, EnhancedVisualizationConfig
+from pydar import LiveRadarSimulation, SimulationConfig, DashRadarVisualizer
+import threading
 
-# Configure enhanced visualization
-config = EnhancedVisualizationConfig(
-    wave_speed_factor=5000,  # Speed up waves for visibility
-    show_power_decay=True,   # Show signal attenuation
-    frame_rate=60.0         # 60 FPS smooth animation
+# Configure simulation
+config = SimulationConfig(
+    duration=60.0,
+    update_rate=20.0,
+    scan_rate=5.0,
+    enable_tracking=True
 )
 
-# Create enhanced visualizer
-visualizer = Enhanced3DRadarVisualizer(config)
+# Create and run simulation
+simulation = LiveRadarSimulation(radar, environment, config)
+visualizer = DashRadarVisualizer(simulation)
 
-# Add targets to scene
-visualizer.add_target(
-    target_id="aircraft",
-    position=(10000, 5000, 3000),  # x, y, z in meters
-    velocity=(150, 0, 0),           # velocity vector
-    rcs=50.0                        # radar cross section
-)
+# Start simulation in background
+sim_thread = threading.Thread(target=simulation.run, daemon=True)
+sim_thread.start()
 
-# Start animated visualization
-visualizer.start()
-
-# Emit radar pulses
-visualizer.emit_pulse(azimuth=30, elevation=10)
+# Run visualization (opens web browser)
+visualizer.run()
 ```
 
 ## Documentation
@@ -135,21 +107,32 @@ Full documentation is available in the `docs/` directory:
 
 ```
 pydar/
-├── pydar/              # Main package
+├── __init__.py          # Package initialization
+├── radar.py             # Radar system and antenna models
+├── target.py            # Target models and dynamics
+├── environment.py       # Environmental effects and clutter
+├── waveforms.py         # Waveform definitions
+├── visualization.py     # Unified visualization module
+├── live_simulation.py   # Real-time simulation engine
+├── scan_result.py       # Scan result data structures
+├── processing/          # Signal processing algorithms
 │   ├── __init__.py
-│   ├── radar.py        # Core radar system classes
-│   ├── target.py       # Target modeling
-│   ├── waveforms.py    # Waveform generators
-│   ├── environment.py  # Environmental modeling
-│   ├── processing/     # Signal processing algorithms
-│   ├── display/        # Visualization components
-│   └── utils/          # Utility functions
-├── tests/              # Test suite
-├── examples/           # Example scripts
-├── docs/               # Documentation
-├── setup.py            # Package setup
-├── requirements.txt    # Dependencies
-└── README.md           # This file
+│   ├── cfar.py         # CFAR detectors
+│   ├── range_doppler.py # Range-Doppler processing
+│   └── tracking.py      # Target tracking algorithms
+├── analysis/            # Analysis tools
+│   ├── __init__.py
+│   └── performance.py   # Performance metrics
+└── utils/              # Utility functions
+    ├── __init__.py
+    ├── constants.py    # Physical constants
+    ├── geometry.py     # Coordinate transformations
+    └── signal.py       # Signal processing utilities
+
+examples/
+├── static_simulation.py  # Static simulation examples
+├── live_simulation.py    # Live simulation with visualization
+└── ...                  # Additional examples
 ```
 
 ## Testing

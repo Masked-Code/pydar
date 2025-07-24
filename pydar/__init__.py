@@ -17,8 +17,7 @@ from .waveforms import (
 )
 from .scan_result import ScanResult
 from .live_simulation import LiveRadarSimulation, SimulationConfig
-from .visualization_3d import Radar3DVisualizer, VisualizationConfig
-from .visualization_3d_enhanced import Enhanced3DRadarVisualizer, EnhancedVisualizationConfig
+from .visualization import Radar3DVisualizer, DashRadarVisualizer, VisualizationConfig, create_animated_visualization
 
 __all__ = [
     # Core radar classes
@@ -51,8 +50,10 @@ __all__ = [
     # Live simulation
     "LiveRadarSimulation",
     "SimulationConfig",
+    
+    # Visualization
     "Radar3DVisualizer",
+    "DashRadarVisualizer",
     "VisualizationConfig",
-    "Enhanced3DRadarVisualizer",
-    "EnhancedVisualizationConfig",
+    "create_animated_visualization",
 ]
