@@ -41,57 +41,60 @@ pip install -r requirements.txt
 
 ## Quick Start
 
-### Static Simulation Example
+### Basic Simulation Example
 
 ```python
 from pydar import RadarSystem, Antenna, LinearFMChirp, Target, Environment
-from pydar import Radar3DVisualizer
 
-# Create radar system
-antenna = Antenna(beamwidth_azimuth=3.0, beamwidth_elevation=3.0, gain=30.0)
-waveform = LinearFMChirp(center_frequency=10e9, bandwidth=50e6, pulse_width=10e-6)
-radar = RadarSystem(antenna=antenna, waveform=waveform, transmit_power=1000)
-
-# Create target
-target = Target(position=[10000, 5000, 3000], velocity=[-100, 0, 0], rcs=10.0)
-
-# Create environment and simulate
-environment = Environment()
-environment.add_target(target)
-
-# Perform scan
-scan_result = radar.scan(environment)
-
-# Visualize
-visualizer = Radar3DVisualizer()
-fig = visualizer.visualize(radar, environment, scan_result=scan_result)
-fig.show()
-```
-
-### Live Simulation Example
-
-```python
-from pydar import LiveRadarSimulation, SimulationConfig, DashRadarVisualizer
-import threading
-
-# Configure simulation
-config = SimulationConfig(
-    duration=60.0,
-    update_rate=20.0,
-    scan_rate=5.0,
-    enable_tracking=True
+# Create radar components
+antenna = Antenna(gain=30, beamwidth_azimuth=2.0, beamwidth_elevation=2.0)
+waveform = LinearFMChirp(
+    duration=10e-6,
+    sample_rate=100e6,
+    bandwidth=50e6,
+    center_frequency=10e9
 )
 
-# Create and run simulation
-simulation = LiveRadarSimulation(radar, environment, config)
-visualizer = DashRadarVisualizer(simulation)
+# Create radar system
+radar = RadarSystem(
+    antenna=antenna,
+    waveform=waveform,
+    position=(0, 0, 0),
+    transmit_power=1000,
+    noise_figure=3,
+    losses=3
+)
 
-# Start simulation in background
-sim_thread = threading.Thread(target=simulation.run, daemon=True)
-sim_thread.start()
+# Create environment with targets
+env = Environment()
+env.add_target(Target(range=5000, velocity=50, rcs=10, azimuth=10))
 
-# Run visualization (opens web browser)
-visualizer.run()
+# Run simulation
+result = radar.scan(env)
+print(f"Detected {len(result.returns)} targets")
+```
+
+### 3D Visualization Example
+
+```python
+from pydar import Radar3DVisualizer, VisualizationConfig
+from pydar import RadarSystem, Target, Environment, LinearFMChirp, Antenna
+
+# Create visualization config
+config = VisualizationConfig(
+    figure_width=1200,
+    figure_height=800,
+    show_statistics=True,
+    show_doppler=True
+)
+
+# Create radar and environment (as above)
+# ...
+
+# Create visualizer
+visualizer = Radar3DVisualizer(config)
+fig = visualizer.visualize(radar, environment, scan_result=result)
+fig.show()
 ```
 
 ## Documentation
@@ -99,9 +102,7 @@ visualizer.run()
 Full documentation is available in the `docs/` directory:
 
 - [User Guide](docs/user_guide.md) - Detailed usage instructions
-- [API Reference](docs/api_reference.md) - Complete API documentation
-- [Theory Guide](docs/theory.md) - Radar theory and implementation details
-- [Examples](examples/) - Example scripts and notebooks
+- [Examples](examples/) - Example scripts demonstrating various features
 
 ## Project Structure
 
@@ -110,29 +111,23 @@ pydar/
 ├── __init__.py          # Package initialization
 ├── radar.py             # Radar system and antenna models
 ├── target.py            # Target models and dynamics
-├── environment.py       # Environmental effects and clutter
+├── environment.py       # Environmental effects
 ├── waveforms.py         # Waveform definitions
-├── visualization.py     # Unified visualization module
-├── live_simulation.py   # Real-time simulation engine
-├── scan_result.py       # Scan result data structures
+├── visualization.py     # 3D visualization module
 ├── processing/          # Signal processing algorithms
 │   ├── __init__.py
 │   ├── cfar.py         # CFAR detectors
 │   ├── range_doppler.py # Range-Doppler processing
 │   └── tracking.py      # Target tracking algorithms
-├── analysis/            # Analysis tools
-│   ├── __init__.py
-│   └── performance.py   # Performance metrics
 └── utils/              # Utility functions
     ├── __init__.py
-    ├── constants.py    # Physical constants
-    ├── geometry.py     # Coordinate transformations
-    └── signal.py       # Signal processing utilities
+    ├── conversions.py   # Unit conversions
+    └── coordinates.py   # Coordinate transformations
 
 examples/
-├── static_simulation.py  # Static simulation examples
-├── live_simulation.py    # Live simulation with visualization
-└── ...                  # Additional examples
+├── basic.py            # Basic radar simulation
+├── static.py           # 3D visualization example
+└── live_3d.py          # Live simulation with Dash
 ```
 
 ## Testing

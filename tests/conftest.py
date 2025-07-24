@@ -5,16 +5,25 @@ Pytest fixtures for PyDar tests.
 import pytest
 import numpy as np
 
-from pydar import RadarSystem, Target, Environment, LinearFMChirp
+from pydar import RadarSystem, Target, Environment, LinearFMChirp, Antenna
 
 
 @pytest.fixture
 def basic_radar():
     """Create a basic radar system for testing."""
+    antenna = Antenna(gain=30, beamwidth_azimuth=3.0, beamwidth_elevation=3.0)
+    waveform = LinearFMChirp(
+        duration=10e-6,
+        sample_rate=100e6,
+        bandwidth=50e6,
+        center_frequency=10e9
+    )
     return RadarSystem(
-        frequency=10e9,  # 10 GHz
-        power=1000,      # 1 kW
-        antenna_gain=30  # 30 dB
+        antenna=antenna,
+        waveform=waveform,
+        transmit_power=1000,
+        noise_figure=3,
+        losses=3
     )
 
 
@@ -47,7 +56,8 @@ def chirp_waveform():
     return LinearFMChirp(
         duration=10e-6,     # 10 μs
         sample_rate=100e6,  # 100 MHz
-        bandwidth=50e6      # 50 MHz
+        bandwidth=50e6,     # 50 MHz
+        center_frequency=10e9  # 10 GHz
     )
 
 

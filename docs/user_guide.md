@@ -29,21 +29,34 @@ pip install -e .
 Here's a simple example to get you started:
 
 ```python
-from pydar import RadarSystem, Target, Environment, LinearFMChirp
+from pydar import RadarSystem, Target, Environment, LinearFMChirp, Antenna
 
-# Create radar
-radar = RadarSystem(frequency=10e9, power=1000, antenna_gain=30)
+# Create antenna
+antenna = Antenna(gain=30, beamwidth_azimuth=2.0, beamwidth_elevation=2.0)
 
 # Create waveform
-waveform = LinearFMChirp(duration=10e-6, sample_rate=100e6, bandwidth=50e6)
+waveform = LinearFMChirp(
+    duration=10e-6,
+    sample_rate=100e6,
+    bandwidth=50e6,
+    center_frequency=10e9
+)
+
+# Create radar
+radar = RadarSystem(
+    antenna=antenna,
+    waveform=waveform,
+    transmit_power=1000,
+    noise_figure=3
+)
 
 # Create environment with target
 env = Environment()
-env.add_target(Target(range=5000, velocity=50, rcs=10))
+env.add_target(Target(range=5000, velocity=50, rcs=10, azimuth=10))
 
 # Run simulation
-result = radar.scan(env, waveform)
-print(result.summary())
+result = radar.scan(env)
+print(f"Detected {len(result.returns)} targets")
 ```
 
 ## Basic Concepts
@@ -68,12 +81,22 @@ PyDar uses a spherical coordinate system:
 ### Basic Radar
 
 ```python
+# First create antenna and waveform
+antenna = Antenna(gain=30, beamwidth_azimuth=3.0, beamwidth_elevation=3.0)
+waveform = LinearFMChirp(
+    duration=10e-6,
+    sample_rate=100e6,
+    bandwidth=50e6,
+    center_frequency=10e9
+)
+
+# Then create radar system
 radar = RadarSystem(
-    frequency=10e9,      # 10 GHz
-    power=1000,          # 1 kW
-    antenna_gain=30,     # 30 dB
-    system_loss=3,       # 3 dB loss
-    noise_figure=3       # 3 dB noise figure
+    antenna=antenna,
+    waveform=waveform,
+    transmit_power=1000,  # 1 kW
+    noise_figure=3,       # 3 dB
+    losses=3              # 3 dB system losses
 )
 ```
 
@@ -86,14 +109,21 @@ antenna = Antenna(
     gain=35,
     beamwidth_azimuth=2,
     beamwidth_elevation=2,
-    sidelobe_level=-20
+    sidelobe_level=-20,
+    efficiency=0.8
+)
+
+waveform = LinearFMChirp(
+    duration=10e-6,
+    sample_rate=200e6,
+    bandwidth=100e6,
+    center_frequency=24e9
 )
 
 radar = RadarSystem(
-    frequency=24e9,
-    power=100,
-    antenna_gain=35,
-    antenna=antenna
+    antenna=antenna,
+    waveform=waveform,
+    transmit_power=100
 )
 ```
 
@@ -105,9 +135,10 @@ Most common radar waveform:
 
 ```python
 chirp = LinearFMChirp(
-    duration=20e-6,      # 20 microseconds
-    sample_rate=200e6,   # 200 MHz sampling
-    bandwidth=100e6      # 100 MHz bandwidth
+    duration=20e-6,          # 20 microseconds
+    sample_rate=200e6,       # 200 MHz sampling
+    bandwidth=100e6,         # 100 MHz bandwidth
+    center_frequency=10e9    # 10 GHz center frequency
 )
 ```
 
@@ -116,12 +147,15 @@ chirp = LinearFMChirp(
 For Doppler processing:
 
 ```python
+from pydar.waveforms import PulseTrain
+
 pulses = PulseTrain(
-    pulse_width=1e-6,    # 1 microsecond pulses
-    prf=5000,            # 5 kHz PRF
-    num_pulses=64,       # 64 pulses
+    pulse_width=1e-6,        # 1 microsecond pulses
+    prf=5000,                # 5 kHz PRF
+    num_pulses=64,           # 64 pulses
     sample_rate=100e6,
-    pulse_type='rect'    # Rectangular pulses
+    center_frequency=10e9,   # 10 GHz center frequency
+    pulse_type='rect'        # Rectangular pulses
 )
 ```
 
@@ -130,10 +164,13 @@ pulses = PulseTrain(
 For pulse compression:
 
 ```python
+from pydar.waveforms import BarkerCode
+
 barker = BarkerCode(
-    code_length=13,      # 13-bit Barker code
-    chip_width=1e-6,     # 1 microsecond chips
-    sample_rate=50e6
+    code_length=13,          # 13-bit Barker code
+    chip_width=1e-6,         # 1 microsecond chips
+    sample_rate=50e6,
+    center_frequency=10e9    # 10 GHz center frequency
 )
 ```
 
@@ -158,39 +195,42 @@ target = Target(
     range=5000,
     velocity=50,
     rcs=10,
-    acceleration=5       # 5 m/s² acceleration
+    azimuth=0,
+    elevation=0
 )
 
-# Update position after 2 seconds
-target.update_position(2.0)
+# Note: For moving targets with acceleration, implement update_position method
+# This is a future enhancement
 ```
 
-### Fluctuating Target (Swerling Models)
+### Fluctuating Target (Future Enhancement)
 
 ```python
-from pydar.target import SwerlingModel
-
+# Swerling models are planned for future implementation
+# For now, targets have constant RCS
 target = Target(
     range=8000,
     velocity=0,
     rcs=20,
-    swerling_model=SwerlingModel.SWERLING_1
+    azimuth=0,
+    elevation=0
 )
 ```
 
-### Extended Target
+### Multiple Targets
 
 ```python
-from pydar.target import ExtendedTarget
+from pydar import TargetCollection
 
-ship = ExtendedTarget(
-    range=15000,
-    velocity=10,
-    rcs=1000,
-    extent_range=100,     # 100m length
-    extent_cross_range=20, # 20m width
-    num_scatterers=50
-)
+# Create a collection of targets
+targets = TargetCollection()
+targets.add_target(Target(range=5000, velocity=30, rcs=10, azimuth=10))
+targets.add_target(Target(range=7000, velocity=-20, rcs=5, azimuth=-5))
+targets.add_target(Target(range=10000, velocity=100, rcs=50, azimuth=0))
+
+# Add to environment
+env = Environment()
+env.targets = targets
 ```
 
 ## Environment Setup
@@ -205,28 +245,10 @@ env.add_target(Target(range=5000, velocity=30, rcs=10))
 env.add_target(Target(range=7000, velocity=-20, rcs=5))
 ```
 
-### Adding Clutter
-
-```python
-# Sea clutter
-env.add_sea_clutter(
-    sea_state=3,         # Sea state 3
-    area=(20000, 60),    # 20km range, 60° azimuth
-    resolution=50        # 50m patches
-)
-
-# Land clutter
-env.add_land_clutter(
-    terrain_type='urban',
-    area=(10000, 30),
-    resolution=25
-)
-```
-
 ### Atmospheric Effects
 
 ```python
-from pydar.environment import Atmosphere
+from pydar import Atmosphere
 
 # Custom atmosphere
 atmosphere = Atmosphere(
@@ -237,7 +259,10 @@ atmosphere = Atmosphere(
 )
 
 env = Environment(atmosphere=atmosphere)
+
+# Note: Clutter models (sea and land) are planned for future implementation
 ```
+
 
 ## Running Simulations
 
@@ -245,25 +270,26 @@ env = Environment(atmosphere=atmosphere)
 
 ```python
 # Perform scan
-result = radar.scan(env, waveform)
+result = radar.scan(env)
 
 # Access results
-print(f"Transmitted samples: {len(result.tx_signal)}")
-print(f"Received samples: {len(result.rx_signal)}")
-print(f"Detected targets: {len(result.target_info)}")
+print(f"Detected targets: {len(result.returns)}")
+for detection in result.returns:
+    print(f"  Range: {detection.range:.1f} m")
+    print(f"  Azimuth: {detection.azimuth:.1f}°")
+    print(f"  Power: {10*np.log10(detection.power):.1f} dBm")
 ```
 
 ### Processing Results
 
 ```python
-# Get matched filter output
-mf_output = result.matched_filter()
+# Note: Advanced processing (matched filtering, range profiles) 
+# requires additional implementation beyond the basic scan
 
-# Get range profile
-ranges, amplitudes = result.range_profile()
-
-# Plot results
-result.plot_range_profile(max_range=20000)
+# For now, work with the detection returns directly
+for detection in result.returns:
+    snr = radar.snr(detection.range, 10.0)  # Assuming 10 m² RCS
+    print(f"Target at {detection.range:.0f}m, SNR: {snr:.1f} dB")
 ```
 
 ## Signal Processing
@@ -324,80 +350,50 @@ confirmed = tracker.get_confirmed_tracks()
 
 ## Visualization
 
-### Range Profile Plot
+### 3D Visualization
 
 ```python
-import matplotlib.pyplot as plt
+from pydar import Radar3DVisualizer, VisualizationConfig
 
-ranges, amplitudes = result.range_profile()
-plt.figure(figsize=(10, 6))
-plt.plot(ranges/1000, 20*np.log10(amplitudes))
-plt.xlabel('Range (km)')
-plt.ylabel('Amplitude (dB)')
-plt.grid(True)
-plt.show()
-```
-
-### Spectrogram
-
-```python
-result.plot_spectrogram(
-    window_size=256,
-    overlap=0.8,
-    figsize=(12, 8)
+# Configure visualization
+config = VisualizationConfig(
+    figure_width=1200,
+    figure_height=800,
+    show_statistics=True,
+    show_doppler=True,
+    show_rcs=True
 )
+
+# Create visualizer
+visualizer = Radar3DVisualizer(config)
+
+# Create visualization
+fig = visualizer.visualize(radar, environment, scan_result=result)
+fig.show()
 ```
 
-### Range-Doppler Map
+### Live Visualization with Dash
 
-```python
-rd_map.plot(
-    db_scale=True,
-    velocity_scale=True,
-    clim=(-40, 0)  # Color limits in dB
-)
-```
+See the `examples/live_3d.py` for a complete example of live visualization using Dash.
 
 ## Advanced Topics
 
-### Multi-Static Radar
+### Future Enhancements
+
+The following features are planned for future releases:
+
+- **Multi-Static Radar**: Support for bistatic and multistatic configurations
+- **Phased Array**: Electronic beam steering and multiple simultaneous beams
+- **Extended Targets**: Targets with spatial extent and multiple scattering centers
+- **Swerling Models**: Statistical RCS fluctuation models
+- **Advanced Clutter**: Sea and land clutter models with realistic statistics
+
+### Data Management
 
 ```python
-# Create multiple radar systems
-radar1 = RadarSystem(frequency=10e9, power=1000, antenna_gain=30)
-radar2 = RadarSystem(frequency=10e9, power=500, antenna_gain=25)
-
-# Position radars (would need position attributes)
-# Simulate bistatic geometry
-```
-
-### Phased Array
-
-```python
-# Future feature: Phased array modeling
-# Would include beam steering, multiple simultaneous beams
-```
-
-### Save/Load Scenarios
-
-```python
-# Save environment
-env.save_scenario('scenario.json')
-
-# Load environment
-new_env = Environment()
-new_env.load_scenario('scenario.json')
-```
-
-### HDF5 Data Storage
-
-```python
-# Save scan results
-result.save_to_hdf5('scan_data.h5')
-
-# Load results
-from pydar.scan_result import ScanResult
-loaded = ScanResult.load_from_hdf5('scan_data.h5')
+# Note: Save/load functionality is planned for future implementation
+# For now, use standard Python serialization methods like pickle
+# or save data manually using numpy/pandas
 ```
 
 ## Best Practices
