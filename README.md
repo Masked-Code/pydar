@@ -28,7 +28,7 @@ A high-fidelity radar simulation library for Python, designed for educational an
 ### Install from source
 
 ```bash
-git clone https://github.com/yourusername/pydar.git
+git clone https://github.com/Masked-Code/pydar.git
 cd pydar
 pip install -e .
 ```
@@ -144,16 +144,3 @@ pytest --cov=pydar
 # Run specific test file
 pytest tests/test_radar.py
 ```
-
-## Contributing
-
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
-## License
-
-This project is licensed under the MIT License - see [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-- Based on radar theory from Skolnik's "Radar Handbook"
-- Signal processing algorithms adapted from Richards' "Fundamentals of Radar Signal Processing"
