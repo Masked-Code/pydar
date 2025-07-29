@@ -10,7 +10,11 @@ __author__ = "PyDar Development Team"
 # Import main classes for easier access
 from .radar import RadarSystem, Antenna
 from .target import Target, TargetCollection
-from .environment import Environment, Atmosphere
+from .environment import (
+    Environment, Atmosphere, EnhancedEnvironment,
+    ClutterModel, SeaClutterModel, LandClutterModel,
+    PropagationModel
+)
 from .waveforms import LinearFMChirp
 from .visualization import Radar3DVisualizer, DashRadarVisualizer, VisualizationConfig
 
@@ -26,6 +30,11 @@ __all__ = [
     # Environment classes
     "Environment",
     "Atmosphere",
+    "EnhancedEnvironment",
+    "ClutterModel",
+    "SeaClutterModel",
+    "LandClutterModel",
+    "PropagationModel",
     
     # Waveform classes
     "LinearFMChirp",
