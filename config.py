@@ -1,0 +1,214 @@
+import math
+import pygame
+from typing import Tuple
+
+# Angles & Time 
+DEG_FULL_CIRCLE: float = 360.0
+DEG_TO_RAD: float = math.pi / 180.0
+RAD_TO_DEG: float = 180.0 / math.pi
+MS_PER_SECOND: float = 1000.0
+FRAME_RATE_TARGET_FPS: int = 60
+
+# Window / Layout 
+WINDOW_WIDTH_PX: int = 2100
+WINDOW_HEIGHT_PX: int = 1200
+CONTROL_PANEL_WIDTH_PX: int = 320
+SCOPE_MARGIN_PX: int = 24
+UI_PANEL_PADDING_PX: int = 40
+UI_VERTICAL_SPACING_PX: int = 48
+UI_TOGGLE_SPACING_PX: int = 30
+UI_TOGGLE_EXTRA_GAP_PX: int = 32
+UI_BUTTON_HEIGHT_PX: int = 28
+UI_BUTTON_ROW_GAP_PX: int = 40
+UI_BUTTON_COL_GAP_PX: int = 8
+UI_RESET_GAP_PX: int = 36
+UI_FOOTER_MARGIN_BOTTOM_PX: int = 28
+UI_STATS_MARGIN_LEFT_PX: int = 24
+UI_STATS_MARGIN_BOTTOM_PX: int = 28
+
+# Fonts 
+FONT_SIZE_DEFAULT_PT: int = 16
+FONT_SIZE_SMALL_PT: int = 12
+FONT_SIZE_LARGE_PT: int = 18
+
+# Scope / Grid 
+RING_COUNT: int = 5
+RING_LABEL_OFFSET_X_PX: int = 6
+RING_LABEL_OFFSET_Y_PX: int = 8
+GRID_LINE_THIN_PX: int = 1
+SCOPE_FRAME_EXTRA_RADIUS_PX: int = 8
+SCOPE_FRAME_THICKNESS_PX: int = 4
+SCOPE_RING_THICKNESS_PX: int = 2
+AZIMUTH_TICK_STEP_DEG: int = 15
+AZIMUTH_TICK_INSET_PX: int = 6
+
+# Sweep & Tracks 
+SWEEP_POLY_SEGMENTS: int = 15
+SWEEP_HEAD_THICKNESS_PX: int = 2
+TRACK_TRAIL_MAXLEN: int = 40
+TRACK_TRAIL_THICKNESS_PX: int = 2
+VELOCITY_VECTOR_THICKNESS_PX: int = 2
+TRACK_MARKER_OUTER_RADIUS_PX: int = 5
+TRACK_MARKER_INNER_RADIUS_PX: int = 2
+RAW_TARGET_MARKER_RADIUS_PX: int = 2
+BLIP_CORE_RADIUS_PX: int = 3
+BLIP_BLOOM_RADIUS_PX: int = 6
+
+# UI Widgets 
+UI_SLIDER_HEIGHT_PX: int = 30
+UI_SLIDER_THUMB_RADIUS_PX: int = 9
+UI_SLIDER_TRACK_HALF_THICKNESS_PX: int = 3
+UI_TOGGLE_BOX_SIZE_PX: int = 20
+UI_TOGGLE_INSET_PX: int = 4
+UI_BUTTON_CORNER_RADIUS_PX: int = 6
+UI_BUTTON_BORDER_THICKNESS_PX: int = 2
+UI_SLIDER_LABEL_OFFSET_Y_PX: int = 8
+
+# Colors 
+COLOR_BACKGROUND: Tuple[int, int, int] = (6, 12, 8)
+COLOR_SCOPE_FRAME: Tuple[int, int, int] = (10, 40, 10)
+COLOR_SCOPE_RING: Tuple[int, int, int] = (20, 70, 20)
+COLOR_GRID_RING: Tuple[int, int, int] = (0, 60, 0)
+COLOR_GRID_CROSS: Tuple[int, int, int] = (0, 60, 0)
+COLOR_AZ_TICK: Tuple[int, int, int] = (0, 80, 0)
+COLOR_RING_TEXT: Tuple[int, int, int] = (70, 180, 90)
+COLOR_SWEEP_WEDGE_RGBA: Tuple[int, int, int, int] = (40, 200, 60, 32)
+COLOR_SWEEP_HEAD_RGBA: Tuple[int, int, int, int] = (90, 255, 120, 200)
+COLOR_BLIP_CORE_RGBA: Tuple[int, int, int, int] = (140, 255, 160, 230)
+COLOR_BLIP_BLOOM_RGBA: Tuple[int, int, int, int] = (70, 200, 90, 150)
+COLOR_RAW_TARGET_RGBA: Tuple[int, int, int, int] = (60, 110, 60, 120)
+COLOR_TRACK_CONFIRMED: Tuple[int, int, int] = (80, 250, 120)
+COLOR_TRACK_TENTATIVE: Tuple[int, int, int] = (140, 160, 90)
+COLOR_TRAIL_RGBA: Tuple[int, int, int, int] = (70, 160, 110, 180)
+COLOR_VELOCITY_RGBA: Tuple[int, int, int, int] = (120, 220, 150, 220)
+COLOR_UI_PANEL_BG: Tuple[int, int, int] = (22, 22, 24)
+COLOR_UI_PANEL_BORDER: Tuple[int, int, int] = (40, 40, 44)
+COLOR_UI_TEXT: Tuple[int, int, int] = (230, 230, 230)
+COLOR_UI_TEXT_MUTED: Tuple[int, int, int] = (180, 180, 180)
+COLOR_UI_STATS_TEXT: Tuple[int, int, int] = (170, 210, 170)
+COLOR_SLIDER_TRACK: Tuple[int, int, int] = (60, 60, 60)
+COLOR_SLIDER_THUMB_FILL: Tuple[int, int, int] = (200, 200, 200)
+COLOR_SLIDER_THUMB_BORDER: Tuple[int, int, int] = (20, 20, 20)
+COLOR_TOGGLE_BG: Tuple[int, int, int] = (60, 60, 60)
+COLOR_TOGGLE_ON: Tuple[int, int, int] = (90, 200, 90)
+COLOR_TOGGLE_OFF: Tuple[int, int, int] = (30, 30, 30)
+COLOR_BUTTON_FILL: Tuple[int, int, int] = (70, 70, 70)
+COLOR_BUTTON_BORDER: Tuple[int, int, int] = (30, 30, 30)
+
+# UI Labels 
+UI_TITLE_TEXT: str = "Radar Controls"
+UI_FOOTER_TEXT: str = "Esc: Quit   Space: Pause   . : Step"
+UI_AZ_TRACKS_PREFIX: str = "Az: "
+
+# Radar / Sweep / Targets 
+SPEED_RPM_TO_DEG_PER_SEC: float = 6.0
+MIN_AFTERGLOW_ALPHA: int = 0
+MAX_AFTERGLOW_ALPHA: int = 255
+AFTERGLOW_DEFAULT_ALPHA_DECAY_PER_FRAME: int = 14
+AFTERGLOW_BLEND_MODE: int = pygame.BLEND_RGBA_SUB
+SWEEP_VEL_SCALE_MIN: float = 0.4
+SWEEP_VEL_SCALE_MAX: float = 1.2
+TARGET_SPEED_SOFT_MAX_DIVISOR: float = 150.0
+TARGET_MANEUVER_MIN_S: float = 2.0
+TARGET_MANEUVER_MAX_S: float = 6.0
+TARGET_ACCELERATION_MIN: float = -0.3
+TARGET_ACCELERATION_MAX: float = 0.3
+
+# Radar Defaults
+RADAR_DEFAULT_MAX_RANGE_M: float = 24000.0
+RADAR_DEFAULT_RANGE_RES_M: float = 90.0
+RADAR_DEFAULT_BEAMWIDTH_DEG: float = 3.0
+RADAR_DEFAULT_RPM: float = 24.0
+RADAR_DEFAULT_NOISE_POWER: float = 1.0
+RADAR_DEFAULT_CLUTTER_ENABLED: bool = True
+RADAR_DEFAULT_FALSE_ALARM_DENSITY: float = 0.0
+
+# CFAR Defaults
+CFAR_DEFAULT_GUARD_CELLS: int = 2
+CFAR_DEFAULT_TRAINING_CELLS: int = 12
+CFAR_DEFAULT_SCALE: float = 4.5
+CFAR_PLATEAU_SUPPRESS_DISTANCE_BINS: int = 2
+
+# Tracker Defaults
+TRACKER_MEASUREMENT_STD_PX: float = 20.0
+TRACKER_ASSOCIATION_GATE_PX: float = 60.0
+TRACKER_CONFIRM_HITS_REQUIRED: int = 3
+TRACKER_MAX_MISSES_ALLOWED: int = 20
+TRACKER_INITIAL_POSITION_VAR: float = 100.0
+TRACKER_INITIAL_VELOCITY_VAR: float = 100.0
+TRACKER_PROCESS_NOISE_ACCEL: float = 2.0
+
+# Target Defaults
+TARGET_DEFAULT_COUNT: int = 14
+TARGET_SPEED_MIN_FACTOR: float = 0.2
+TARGET_SPEED_SPAWN_MIN_FACTOR: float = 0.3
+TARGET_RANGE_SPAWN_MIN_M: float = 500.0
+TARGET_RANGE_SPAWN_INNER_MIN_M: float = 1500.0
+TARGET_RANGE_SPAWN_MAX_FACTOR: float = 0.95
+TARGET_RANGE_SPAWN_BULK_MAX_FACTOR: float = 0.85
+TARGET_RCS_DECADE_MIN: float = 2.0
+TARGET_RCS_DECADE_MAX: float = 4.0
+
+# Measurement Noise Factors
+MEASUREMENT_RANGE_JITTER_STD_FACTOR: float = 0.4
+MEASUREMENT_ANGLE_JITTER_STD_FACTOR: float = 0.25
+
+# Derived
+SWEEP_WEDGE_ALPHA: int = COLOR_SWEEP_WEDGE_RGBA[3]
+SWEEP_HEAD_ALPHA: int = COLOR_SWEEP_HEAD_RGBA[3]
+
+# Contorls
+LABEL_SHOW_RAW: str = "Show raw detections"
+LABEL_CLUTTER: str = "Clutter on"
+LABEL_TRAILS: str = "Show track trails"
+LABEL_LABELS: str = "Show labels"
+LABEL_SPAWN_BUTTON: str = "Spawn Target"
+LABEL_REMOVE_BUTTON: str = "Remove Target"
+LABEL_RESET_TRACKS: str = "Reset Tracks"
+LABEL_PAUSE_STEP: str = "Pause / Step [Space]"
+
+# Slider Labels
+SLIDER_LABEL_MAX_RANGE_KM: str = "Max Range (km)"
+SLIDER_LABEL_RPM: str = "Rotation (RPM)"
+SLIDER_LABEL_BEAMWIDTH_DEG: str = "Beamwidth (deg)"
+SLIDER_LABEL_RANGE_RES_M: str = "Range Res (m)"
+SLIDER_LABEL_NOISE: str = "Noise Power"
+SLIDER_LABEL_CFAR: str = "CFAR Scale"
+SLIDER_LABEL_AFTERGLOW: str = "Afterglow"
+SLIDER_LABEL_TARGETS: str = "Targets"
+SLIDER_LABEL_MAX_SPEED: str = "Max Speed (m/s)"
+
+# Slider Ranges
+SLIDER_MAX_RANGE_KM_MIN: float = 6.0
+SLIDER_MAX_RANGE_KM_MAX: float = 60.0
+SLIDER_MAX_RANGE_KM_STEP: float = 1.0
+
+SLIDER_RPM_MIN: float = 6.0
+SLIDER_RPM_MAX: float = 48.0
+SLIDER_RPM_STEP: float = 1.0
+
+SLIDER_BEAMWIDTH_MIN_DEG: float = 1.0
+SLIDER_BEAMWIDTH_MAX_DEG: float = 10.0
+SLIDER_BEAMWIDTH_STEP_DEG: float = 0.5
+
+SLIDER_RANGE_RES_MIN_M: float = 15.0
+SLIDER_RANGE_RES_MAX_M: float = 300.0
+SLIDER_RANGE_RES_STEP_M: float = 5.0
+
+SLIDER_NOISE_MIN: float = 0.2
+SLIDER_NOISE_MAX: float = 4.0
+
+SLIDER_CFAR_MIN: float = 2.0
+SLIDER_CFAR_MAX: float = 10.0
+SLIDER_CFAR_STEP: float = 0.1
+
+SLIDER_AFTERGLOW_MIN: float = 4.0
+SLIDER_AFTERGLOW_MAX: float = 40.0
+SLIDER_AFTERGLOW_STEP: float = 1.0
+
+SLIDER_TARGETS_MIN: int = 0
+SLIDER_TARGETS_MAX: int = 40
+
+SLIDER_MAX_SPEED_MIN_MPS: float = 30.0
+SLIDER_MAX_SPEED_MAX_MPS: float = 250.0
+SLIDER_MAX_SPEED_STEP_MPS: float = 5.0
