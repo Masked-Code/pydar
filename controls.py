@@ -1,9 +1,6 @@
 import pygame
 import config
-
-
-def clamp(value: float, vmin: float, vmax: float) -> float:
-    return vmax if value > vmax else vmin if value < vmin else value
+from core.utils import clamp
 
 
 class Slider:

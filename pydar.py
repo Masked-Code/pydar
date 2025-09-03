@@ -4,32 +4,21 @@ import sys
 from collections import deque
 from dataclasses import dataclass, field
 from typing import List, Tuple, Optional
+import os
+
+os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1'
+
 import config
-from controls import Slider, Toggle, Button, clamp
+from controls import Slider, Toggle, Button
+from core import wrap_angle_deg, lerp, pol2cart, cart2pol, clamp, init_fonts
 
 import numpy as np
 import pygame
 
-
-def wrap_angle_deg(angle_deg: float) -> float:
-    return (angle_deg + config.DEG_FULL_CIRCLE) % config.DEG_FULL_CIRCLE
-
-def lerp(a: float, b: float, t: float) -> float:
-    return a + (b - a) * t
-
-def pol2cart(radius: float, angle_deg: float) -> Tuple[float, float]:
-    theta = angle_deg * config.DEG_TO_RAD
-    return radius * math.cos(theta), radius * math.sin(theta)
-
-def cart2pol(x: float, y: float) -> Tuple[float, float]:
-    radius = math.hypot(x, y)
-    angle_deg = math.atan2(y, x) * config.RAD_TO_DEG
-    return radius, wrap_angle_deg(angle_deg)
-
-pygame.init()
-FONT = pygame.font.SysFont("consolas", config.FONT_SIZE_DEFAULT_PT)
-FONT_SM = pygame.font.SysFont("consolas", config.FONT_SIZE_SMALL_PT)
-FONT_LG = pygame.font.SysFont("consolas", config.FONT_SIZE_LARGE_PT, bold=True)
+fonts = init_fonts()
+FONT = fonts['default']
+FONT_SM = fonts['small']
+FONT_LG = fonts['large']
 
 
 @dataclass
