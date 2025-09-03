@@ -5,13 +5,11 @@ from collections import deque
 from dataclasses import dataclass, field
 from typing import List, Tuple, Optional
 import config
+from controls import Slider, Toggle, Button, clamp
 
 import numpy as np
 import pygame
 
-
-def clamp(value: float, vmin: float, vmax: float) -> float:
-    return vmax if value > vmax else vmin if value < vmin else value
 
 def wrap_angle_deg(angle_deg: float) -> float:
     return (angle_deg + config.DEG_FULL_CIRCLE) % config.DEG_FULL_CIRCLE
@@ -33,92 +31,6 @@ FONT = pygame.font.SysFont("consolas", config.FONT_SIZE_DEFAULT_PT)
 FONT_SM = pygame.font.SysFont("consolas", config.FONT_SIZE_SMALL_PT)
 FONT_LG = pygame.font.SysFont("consolas", config.FONT_SIZE_LARGE_PT, bold=True)
 
-class Slider:
-    def __init__(self, x, y, w, label, vmin, vmax, v0, step=None, fmt="{:.2f}"):
-        self.rect = pygame.Rect(x, y, w, config.UI_SLIDER_HEIGHT_PX)
-        self.label = label
-        self.vmin, self.vmax = vmin, vmax
-        self.value = clamp(v0, vmin, vmax)
-        self.step = step
-        self.fmt = fmt
-        self.dragging = False
-
-    def handle(self, event):
-        if event.type == pygame.MOUSEBUTTONDOWN and self.rect.collidepoint(event.pos):
-            self.dragging = True
-            self._set_from_mouse(event.pos[0])
-        elif event.type == pygame.MOUSEBUTTONUP:
-            self.dragging = False
-        elif event.type == pygame.MOUSEMOTION and self.dragging:
-            self._set_from_mouse(event.pos[0])
-
-    def _set_from_mouse(self, mx):
-        x, y, w, h = self.rect
-        t = clamp((mx - x) / w, 0.0, 1.0)
-        val = self.vmin + t * (self.vmax - self.vmin)
-        if self.step is not None:
-            steps = round((val - self.vmin) / self.step)
-            val = self.vmin + steps * self.step
-        self.value = clamp(val, self.vmin, self.vmax)
-
-    def draw(self, surf):
-        x, y, w, h = self.rect
-        pygame.draw.rect(
-            surf,
-            config.COLOR_SLIDER_TRACK,
-            (x, y + h // 2 - config.UI_SLIDER_TRACK_HALF_THICKNESS_PX, w, config.UI_SLIDER_TRACK_HALF_THICKNESS_PX * 2),
-            border_radius=config.UI_SLIDER_TRACK_HALF_THICKNESS_PX
-        )
-        t = (self.value - self.vmin) / (self.vmax - self.vmin)
-        tx = x + int(t * w)
-        pygame.draw.circle(surf, config.COLOR_SLIDER_THUMB_FILL, (tx, y + h // 2), config.UI_SLIDER_THUMB_RADIUS_PX)
-        pygame.draw.circle(surf, config.COLOR_SLIDER_THUMB_BORDER, (tx, y + h // 2), config.UI_SLIDER_THUMB_RADIUS_PX, config.GRID_LINE_THIN_PX+1)
-
-        label_text = f"{self.label}: {self.fmt.format(self.value)}"
-        surf.blit(FONT.render(label_text, True, config.COLOR_UI_TEXT), (x, y - config.UI_SLIDER_LABEL_OFFSET_Y_PX))
-
-class Toggle:
-    def __init__(self, x, y, label, value=False):
-        self.rect = pygame.Rect(x, y, config.UI_TOGGLE_BOX_SIZE_PX, config.UI_TOGGLE_BOX_SIZE_PX)
-        self.label = label
-        self.value = value
-
-    def handle(self, event):
-        if event.type == pygame.MOUSEBUTTONDOWN and (self.rect.collidepoint(event.pos) or self.get_label_rect().collidepoint(event.pos)):
-            self.value = not self.value
-
-    def get_label_rect(self):
-        lbl = FONT.render(self.label, True, config.COLOR_UI_TEXT)
-        r = lbl.get_rect()
-        r.topleft = (self.rect.right + config.UI_TOGGLE_INSET_PX * 2, self.rect.top - config.GRID_LINE_THIN_PX)
-        return r
-
-    def draw(self, surf):
-        pygame.draw.rect(surf, config.COLOR_TOGGLE_BG, self.rect, border_radius=config.GRID_LINE_THIN_PX+2)
-        inner_rect = self.rect.inflate(-config.UI_TOGGLE_INSET_PX, -config.UI_TOGGLE_INSET_PX)
-        pygame.draw.rect(surf, config.COLOR_TOGGLE_ON if self.value else config.COLOR_TOGGLE_OFF, inner_rect, border_radius=config.GRID_LINE_THIN_PX+2)
-        surf.blit(FONT.render(self.label, True, config.COLOR_UI_TEXT), (self.rect.right + config.UI_TOGGLE_INSET_PX * 2, self.rect.top - config.GRID_LINE_THIN_PX))
-
-class Button:
-    def __init__(self, x, y, w, h, label):
-        self.rect = pygame.Rect(x, y, w, h)
-        self.label = label
-        self.clicked = False
-
-    def handle(self, event):
-        if event.type == pygame.MOUSEBUTTONDOWN and self.rect.collidepoint(event.pos):
-            self.clicked = True
-
-    def consume_click(self):
-        was = self.clicked
-        self.clicked = False
-        return was
-
-    def draw(self, surf):
-        pygame.draw.rect(surf, config.COLOR_BUTTON_FILL, self.rect, border_radius=config.UI_BUTTON_CORNER_RADIUS_PX)
-        pygame.draw.rect(surf, config.COLOR_BUTTON_BORDER, self.rect, config.UI_BUTTON_BORDER_THICKNESS_PX, border_radius=config.UI_BUTTON_CORNER_RADIUS_PX)
-        lbl = FONT.render(self.label, True, config.COLOR_UI_TEXT)
-        surf.blit(lbl, (self.rect.centerx - lbl.get_width() // 2, self.rect.centery - lbl.get_height() // 2))
 
 @dataclass
 class Target:
@@ -364,43 +276,43 @@ class App:
 
         self.s_max_range = Slider(x0, y, w, config.SLIDER_LABEL_MAX_RANGE_KM,
                                   config.SLIDER_MAX_RANGE_KM_MIN, config.SLIDER_MAX_RANGE_KM_MAX,
-                                  self.radar.max_range_m / 1000.0, step=config.SLIDER_MAX_RANGE_KM_STEP, fmt="{:.0f}"); y += config.UI_VERTICAL_SPACING_PX
+                                  self.radar.max_range_m / 1000.0, step=config.SLIDER_MAX_RANGE_KM_STEP, fmt="{:.0f}", font=FONT); y += config.UI_VERTICAL_SPACING_PX
         self.s_rpm       = Slider(x0, y, w, config.SLIDER_LABEL_RPM,
                                   config.SLIDER_RPM_MIN, config.SLIDER_RPM_MAX,
-                                  self.radar.rpm, step=config.SLIDER_RPM_STEP, fmt="{:.0f}"); y += config.UI_VERTICAL_SPACING_PX
+                                  self.radar.rpm, step=config.SLIDER_RPM_STEP, fmt="{:.0f}", font=FONT); y += config.UI_VERTICAL_SPACING_PX
         self.s_bw        = Slider(x0, y, w, config.SLIDER_LABEL_BEAMWIDTH_DEG,
                                   config.SLIDER_BEAMWIDTH_MIN_DEG, config.SLIDER_BEAMWIDTH_MAX_DEG,
-                                  self.radar.beamwidth_deg, step=config.SLIDER_BEAMWIDTH_STEP_DEG, fmt="{:.1f}"); y += config.UI_VERTICAL_SPACING_PX
+                                  self.radar.beamwidth_deg, step=config.SLIDER_BEAMWIDTH_STEP_DEG, fmt="{:.1f}", font=FONT); y += config.UI_VERTICAL_SPACING_PX
         self.s_res       = Slider(x0, y, w, config.SLIDER_LABEL_RANGE_RES_M,
                                   config.SLIDER_RANGE_RES_MIN_M, config.SLIDER_RANGE_RES_MAX_M,
-                                  self.radar.range_res_m, step=config.SLIDER_RANGE_RES_STEP_M, fmt="{:.0f}"); y += config.UI_VERTICAL_SPACING_PX
+                                  self.radar.range_res_m, step=config.SLIDER_RANGE_RES_STEP_M, fmt="{:.0f}", font=FONT); y += config.UI_VERTICAL_SPACING_PX
         self.s_noise     = Slider(x0, y, w, config.SLIDER_LABEL_NOISE,
                                   config.SLIDER_NOISE_MIN, config.SLIDER_NOISE_MAX,
-                                  self.radar.noise_power, fmt="{:.2f}"); y += config.UI_VERTICAL_SPACING_PX
+                                  self.radar.noise_power, fmt="{:.2f}", font=FONT); y += config.UI_VERTICAL_SPACING_PX
         self.s_cfar      = Slider(x0, y, w, config.SLIDER_LABEL_CFAR,
                                   config.SLIDER_CFAR_MIN, config.SLIDER_CFAR_MAX,
-                                  self.radar.cfar_scale, step=config.SLIDER_CFAR_STEP, fmt="{:.1f}"); y += config.UI_VERTICAL_SPACING_PX
+                                  self.radar.cfar_scale, step=config.SLIDER_CFAR_STEP, fmt="{:.1f}", font=FONT); y += config.UI_VERTICAL_SPACING_PX
         self.s_after     = Slider(x0, y, w, config.SLIDER_LABEL_AFTERGLOW,
                                   config.SLIDER_AFTERGLOW_MIN, config.SLIDER_AFTERGLOW_MAX,
-                                  self.radar.afterglow_decay, step=config.SLIDER_AFTERGLOW_STEP, fmt="{:.0f}"); y += config.UI_VERTICAL_SPACING_PX
+                                  self.radar.afterglow_decay, step=config.SLIDER_AFTERGLOW_STEP, fmt="{:.0f}", font=FONT); y += config.UI_VERTICAL_SPACING_PX
         self.s_tgt_count = Slider(x0, y, w, config.SLIDER_LABEL_TARGETS,
                                   config.SLIDER_TARGETS_MIN, config.SLIDER_TARGETS_MAX,
-                                  self.target_count, step=1.0, fmt="{:.0f}"); y += config.UI_VERTICAL_SPACING_PX
+                                  self.target_count, step=1.0, fmt="{:.0f}", font=FONT); y += config.UI_VERTICAL_SPACING_PX
         self.s_tgt_spd   = Slider(x0, y, w, config.SLIDER_LABEL_MAX_SPEED,
                                   config.SLIDER_MAX_SPEED_MIN_MPS, config.SLIDER_MAX_SPEED_MAX_MPS,
-                                  self.target_speed_max, step=config.SLIDER_MAX_SPEED_STEP_MPS, fmt="{:.0f}"); y += config.UI_VERTICAL_SPACING_PX
+                                  self.target_speed_max, step=config.SLIDER_MAX_SPEED_STEP_MPS, fmt="{:.0f}", font=FONT); y += config.UI_VERTICAL_SPACING_PX
 
         y += config.GRID_LINE_THIN_PX * 8
-        self.t_show_raw   = Toggle(x0, y, config.LABEL_SHOW_RAW, False); y += config.UI_TOGGLE_SPACING_PX
-        self.t_clutter    = Toggle(x0, y, config.LABEL_CLUTTER, True); y += config.UI_TOGGLE_SPACING_PX
-        self.t_trails     = Toggle(x0, y, config.LABEL_TRAILS, True); y += config.UI_TOGGLE_SPACING_PX
-        self.t_labels     = Toggle(x0, y, config.LABEL_LABELS, True); y += config.UI_TOGGLE_EXTRA_GAP_PX
+        self.t_show_raw   = Toggle(x0, y, config.LABEL_SHOW_RAW, False, font=FONT); y += config.UI_TOGGLE_SPACING_PX
+        self.t_clutter    = Toggle(x0, y, config.LABEL_CLUTTER, True, font=FONT); y += config.UI_TOGGLE_SPACING_PX
+        self.t_trails     = Toggle(x0, y, config.LABEL_TRAILS, True, font=FONT); y += config.UI_TOGGLE_SPACING_PX
+        self.t_labels     = Toggle(x0, y, config.LABEL_LABELS, True, font=FONT); y += config.UI_TOGGLE_EXTRA_GAP_PX
 
         half_w = (w - config.UI_BUTTON_COL_GAP_PX) // 2
-        self.b_add_tgt    = Button(x0, y, half_w, config.UI_BUTTON_HEIGHT_PX, config.LABEL_SPAWN_BUTTON)
-        self.b_rem_tgt    = Button(x0 + half_w + config.UI_BUTTON_COL_GAP_PX, y, half_w, config.UI_BUTTON_HEIGHT_PX, config.LABEL_REMOVE_BUTTON); y += config.UI_BUTTON_ROW_GAP_PX
-        self.b_reset_tr   = Button(x0, y, w, config.UI_BUTTON_HEIGHT_PX, config.LABEL_RESET_TRACKS); y += config.UI_RESET_GAP_PX
-        self.b_pause      = Button(x0, y, w, config.UI_BUTTON_HEIGHT_PX, config.LABEL_PAUSE_STEP); y += config.UI_RESET_GAP_PX
+        self.b_add_tgt    = Button(x0, y, half_w, config.UI_BUTTON_HEIGHT_PX, config.LABEL_SPAWN_BUTTON, font=FONT)
+        self.b_rem_tgt    = Button(x0 + half_w + config.UI_BUTTON_COL_GAP_PX, y, half_w, config.UI_BUTTON_HEIGHT_PX, config.LABEL_REMOVE_BUTTON, font=FONT); y += config.UI_BUTTON_ROW_GAP_PX
+        self.b_reset_tr   = Button(x0, y, w, config.UI_BUTTON_HEIGHT_PX, config.LABEL_RESET_TRACKS, font=FONT); y += config.UI_RESET_GAP_PX
+        self.b_pause      = Button(x0, y, w, config.UI_BUTTON_HEIGHT_PX, config.LABEL_PAUSE_STEP, font=FONT); y += config.UI_RESET_GAP_PX
 
         self.ui_elements = [
             self.s_max_range, self.s_rpm, self.s_bw, self.s_res, self.s_noise,

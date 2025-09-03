@@ -97,7 +97,7 @@ COLOR_BUTTON_BORDER: Tuple[int, int, int] = (30, 30, 30)
 
 # UI Labels 
 UI_TITLE_TEXT: str = "Radar Controls"
-UI_FOOTER_TEXT: str = "Esc: Quit   Space: Pause   . : Step"
+UI_FOOTER_TEXT: str = "Esc: Quit   Space: Pause  . : Step"
 UI_AZ_TRACKS_PREFIX: str = "Az: "
 
 # Radar / Sweep / Targets 
